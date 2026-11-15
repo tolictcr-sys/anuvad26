@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Competition</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg: #F3F4F6;
+            --card-bg: #FFFFFF;
+            --text: #1F2937;
+            --error: #EF4444;
+            --success: #10B981;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .container { background: var(--card-bg); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 800px; }
+        
+        /* Login Screen */
+        #login-screen { text-align: center; max-width: 400px; margin: 0 auto; }
+        #login-screen h1 { margin-bottom: 10px; color: var(--primary); }
+        #login-screen p { margin-bottom: 30px; color: #6B7280; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+        .input-group input { width: 100%; padding: 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 16px; transition: border-color 0.2s; }
+        .input-group input:focus { outline: none; border-color: var(--primary); }
+        button { width: 100%; padding: 14px; background-color: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: var(--primary-hover); }
+        button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
+        .error-msg { color: var(--error); margin-top: 15px; font-size: 14px; display: none; }
+
+        /* Quiz Screen */
+        #quiz-screen { display: none; }
+        .quiz-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #E5E7EB; padding-bottom: 20px; margin-bottom: 30px; position: sticky; top: 0; background: var(--card-bg); z-index: 10; }
+        .timer { background: #FEF2F2; color: var(--error); padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 18px; border: 1px solid #FCA5A5; }
+        .question-card { margin-bottom: 30px; padding: 20px; border: 1px solid #E5E7EB; border-radius: 8px; background: #F9FAFB; }
+        .question-text { font-size: 18px; font-weight: 600; margin-bottom: 15px; }
+        .options label { display: block; padding: 12px; margin-bottom: 10px; border: 1px solid #D1D5DB; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        .options label:hover { background: #E5E7EB; }
+        .options input[type="radio"] { margin-right: 10px; transform: scale(1.2); }
+        .options input[type="radio"]:checked + span { font-weight: bold; color: var(--primary); }
+
+        /* Result Screen */
+        #result-screen { display: none; text-align: center; }
+        #result-screen h1 { color: var(--success); margin-bottom: 20px; font-size: 36px; }
+        .score-display { font-size: 64px; font-weight: bold; color: var(--primary); margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 1. LOGIN SCREEN -->
+        <div id="login-screen">
+            <h1>Translation Competition</h1>
+            <p>Enter your Email and OTP to begin the quiz.</p>
+            <div class="input-group">
+                <label>Email Address</label>
+                <input type="email" id="email" placeholder="e.g. john@example.com">
+            </div>
+            <div class="input-group">
+                <label>OTP</label>
+                <input type="text" id="otp" placeholder="Enter 6-digit OTP">
+            </div>
+            <button onclick="login()" id="login-btn">Start Quiz</button>
+            <div class="error-msg" id="login-error"></div>
+        </div>
+
+        <!-- 2. QUIZ SCREEN -->
+        <div id="quiz-screen">
+            <div class="quiz-header">
+                <h2 id="welcome-text">Good luck!</h2>
+                <div class="timer" id="timer-display">15:00</div>
+            </div>
+            <div id="questions-container">
+                <!-- Questions will be injected here by JavaScript -->
+            </div>
+            <button onclick="submitQuiz()" id="submit-btn" style="background-color: var(--success);">Submit Quiz</button>
+        </div>
+
+        <!-- 3. RESULT SCREEN -->
+        <div id="result-screen">
+            <h1>Quiz Completed!</h1>
+            <p>Thank you for participating.</p>
+            <div class="score-display" id="final-score">0</div>
+            <p>You can now close this window.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW:
+        const API_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
+        
+        let currentEmail = "";
+        let timerInterval;
+        let timeLeft = 15 * 60; // 15 minutes in seconds
+
+        // --- LOGIN LOGIC ---
+        async function login() {
+            const emailInput = document.getElementById('email').value.trim();
+            const otpInput = document.getElementById('otp').value.trim();
+            const btn = document.getElementById('login-btn');
+            const errorMsg = document.getElementById('login-error');
+
+            if (!emailInput || !otpInput) {
+                showError("Please enter both Email and OTP.");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "Verifying...";
+            errorMsg.style.display = "none";
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ action: "login", email: emailInput, otp: otpInput })
+                });
+                const data = await response.json();
+
+                if (data.status === "success") {
+                    currentEmail = emailInput;
+                    document.getElementById('welcome-text').innerText = `Welcome, ${data.participantName}!`;
+                    renderQuiz(data.questions);
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('quiz-screen').style.display = 'block';
+                    startTimer();
+                } else {
+                    showError(data.message);
+                    btn.disabled = false;
+                    btn.innerText = "Start Quiz";
+                }
+            } catch (err) {
+                showError("Network error. Please check your connection.");
+                btn.disabled = false;
+                btn.innerText = "Start Quiz";
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('login-error');
+            el.innerText = msg;
+            el.style.display = "block";
+        }
+
+        // --- RENDER QUESTIONS ---
+        function renderQuiz(questions) {
+            const container = document.getElementById('questions-container');
+            container.innerHTML = "";
+
+            questions.forEach((q, index) => {
+                const qDiv = document.createElement('div');
+                qDiv.className = 'question-card';
+                qDiv.innerHTML = `
+                    <div class="question-text">${index + 1}. ${q.question}</div>
+                    <div class="options">
+                        <label><input type="radio" name="q_${q.id}" value="A"><span>A) ${q.options.A}</span></label>
+                        <label><input type="radio" name="q_${q.id}" value="B"><span>B) ${q.options.B}</span></label>
+                        <label><input type="radio" name="q_${q.id}" value="C"><span>C) ${q.options.C}</span></label>
+                        <label><input type="radio" name="q_${q.id}" value="D"><span>D) ${q.options.D}</span></label>
+                    </div>
+                `;
+                container.appendChild(qDiv);
+            });
+        }
+
+        // --- TIMER LOGIC ---
+        function startTimer() {
+            const display = document.getElementById('timer-display');
+            timerInterval = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    alert("Time is up! Your quiz will be submitted automatically.");
+                    submitQuiz();
+                    return;
+                }
+                timeLeft--;
+                const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                const s = (timeLeft % 60).toString().padStart(2, '0');
+                display.innerText = `${m}:${s}`;
+            }, 1000);
+        }
+
+        // --- SUBMIT LOGIC ---
+        async function submitQuiz() {
+            if(!confirm("Are you sure you want to submit? You cannot change your answers after submitting.")) return;
+            
+            clearInterval(timerInterval);
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerText = "Submitting...";
+
+            const answers = {};
+            // Gather all selected radio buttons
+            const radios = document.querySelectorAll('input[type="radio"]:checked');
+            radios.forEach(radio => {
+                // Name format is "q_ID"
+                const qId = radio.name.split('_')[1];
+                answers[qId] = radio.value;
+            });
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ action: "submit", email: currentEmail, answers: answers })
+                });
+                const data = await response.json();
+
+                if (data.status === "success") {
+                    document.getElementById('quiz-screen').style.display = 'none';
+                    document.getElementById('result-screen').style.display = 'block';
+                    document.getElementById('final-score').innerText = data.score;
+                } else {
+                    alert("Error saving score: " + data.message);
+                    btn.disabled = false;
+                    btn.innerText = "Submit Quiz";
+                }
+            } catch (err) {
+                alert("Network error. Please try again.");
+                btn.disabled = false;
+                btn.innerText = "Submit Quiz";
+            }
+        }
+    </script>
+</body>
+</html>
