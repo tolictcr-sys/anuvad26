@@ -11,7 +11,7 @@
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
         body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-        .container { background: var(--card-bg); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 800px; position: relative; overflow: hidden;}
+        .container { background: var(--card-bg); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 800px; position: relative; }
         
         /* Login Shared */
         .center-screen { text-align: center; max-width: 500px; margin: 0 auto; }
@@ -34,6 +34,10 @@
         .options label:hover { border-color: var(--primary); background: #F3F4F6; }
         .options input[type="radio"] { margin-right: 12px; transform: scale(1.2); }
         .options input[type="radio"]:checked + span { font-weight: bold; color: var(--primary); }
+        
+        /* Next Button */
+        #next-btn { background-color: var(--success); margin-top: 20px; }
+        #next-btn:hover { background-color: #059669; }
     </style>
 </head>
 <body>
@@ -41,11 +45,11 @@
     <div class="container">
         <!-- LOGIN -->
         <div id="login-screen" class="center-screen">
-            <h1>अनुवाद प्रतियोगिता Translation Competition-2026</h1>
+            <h1>Translation Competition</h1>
             <p style="margin-bottom: 30px; color: #6B7280;">Enter your Email and OTP to begin.</p>
             <div class="input-group">
                 <label>Email Address</label>
-                <input type="email" id="email" placeholder="abcd@example.com">
+                <input type="email" id="email" placeholder="john@example.com">
             </div>
             <div class="input-group">
                 <label>OTP</label>
@@ -58,18 +62,20 @@
         <!-- QUIZ -->
         <div id="quiz-screen">
             <div class="quiz-header">
-                <h2 id="welcome-text">शुभकामनाएं  Good luck!</h2>
-                <div class="q-counter" id="q-counter">Question 1 of 30</div>
+                <h2 id="welcome-text">Good luck!</h2>
+                <div class="q-counter" id="q-counter">Question 1</div>
             </div>
             <div class="timer-bar-container">
                 <div class="timer-bar" id="timer-bar"></div>
             </div>
             <div class="question-text" id="question-text"></div>
             <div class="options" id="options-container"></div>
+            <!-- NEW NEXT BUTTON -->
+            <button id="next-btn" onclick="manualNext()">Next Question</button>
         </div>
 
         <!-- RESULT -->
-        <div id="result-screen" class="center-screen">
+        <div id="result-screen" class="center-screen" style="display: none;">
             <h1 style="color: var(--success);">Quiz Completed!</h1>
             <p style="margin: 20px 0; font-size: 18px;">सहभागिता के लिए धन्यवाद Thank you for participating. Your answers have been recorded.</p>
             <p style="color: #6B7280; font-size: 14px;">You may now close this window.</p>
@@ -77,7 +83,7 @@
     </div>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbz07esSHvstXPSWV6YZuem1FU2TGceHVpIbpf9yI6KVx1Q99kIL9IIE_TAqGJrpCqlgug/exec"; // <--- ENSURE THIS IS YOUR URL
+        const API_URL = "PASTE_YOUR_WEB_APP_URL_HERE"; // <--- ENSURE THIS IS YOUR URL
         const TIME_PER_QUESTION = 20; // 20 seconds
 
         let currentEmail = "";
@@ -106,7 +112,7 @@
 
                 if (data.status === "success") {
                     currentEmail = emailInput;
-                    questions = data.questions; // This is now 30 random questions!
+                    questions = data.questions;
                     document.getElementById('welcome-text').innerText = `Welcome, ${data.participantName}!`;
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('quiz-screen').style.display = 'block';
@@ -147,6 +153,16 @@
                 radios.forEach(r => { if(r.value === answers[q.id]) r.checked = true; });
             }
 
+            // Change button text on the last question
+            const nextBtn = document.getElementById('next-btn');
+            if (index === questions.length - 1) {
+                nextBtn.innerText = "Submit Quiz";
+                nextBtn.style.backgroundColor = "var(--error)";
+            } else {
+                nextBtn.innerText = "Next Question";
+                nextBtn.style.backgroundColor = "var(--success)";
+            }
+
             startTimer();
         }
 
@@ -154,12 +170,14 @@
             const bar = document.getElementById('timer-bar');
             clearInterval(timerInterval);
             
+            // Reset bar
             bar.style.transition = 'none';
             bar.style.width = '100%';
             bar.style.backgroundColor = 'var(--success)';
             
             void bar.offsetWidth; 
 
+            // Start animation
             bar.style.transition = `width ${TIME_PER_QUESTION}s linear, background-color 0.5s`;
             bar.style.width = '0%';
 
@@ -175,15 +193,26 @@
             }, 1000);
         }
 
+        // Triggered by the Button Click
+        function manualNext() {
+            clearInterval(timerInterval);
+            saveAnswerAndNext();
+        }
+
         function saveAnswerAndNext() {
             const selected = document.querySelector('input[name="q"]:checked');
             if (selected) {
                 answers[questions[currentQIndex].id] = selected.value;
             } else {
-                answers[questions[currentQIndex].id] = null; 
+                answers[questions[currentQIndex].id] = null; // Timed out or skipped
             }
             
-            loadQuestion(currentQIndex + 1);
+            // Add a tiny delay so the user feels a click response
+            document.getElementById('next-btn').disabled = true;
+            setTimeout(() => {
+                document.getElementById('next-btn').disabled = false;
+                loadQuestion(currentQIndex + 1);
+            }, 200);
         }
 
         async function submitQuiz() {
