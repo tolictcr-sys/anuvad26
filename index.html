@@ -106,8 +106,24 @@
                 const data = await response.json();
 
                 if (data.status === "success") {
-                    currentEmail = emailInput;
-                    questions = data.questions;
+
+    console.log("Questions received from server:", data.questions);
+    console.log("Number of questions:", data.questions?.length);
+
+    if (!Array.isArray(data.questions) || data.questions.length !== 30) {
+        showError(
+            "Error: The server returned " +
+            (data.questions?.length || 0) +
+            " questions instead of 30. Please contact the quiz administrator."
+        );
+
+        btn.disabled = false;
+        btn.innerText = "Start Quiz";
+        return;
+    }
+
+    currentEmail = emailInput;
+    questions = data.questions;
                     document.getElementById('welcome-text').innerText = `Welcome, ${data.participantName}!`;
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('quiz-screen').style.display = 'block';
