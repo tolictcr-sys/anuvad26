@@ -12,7 +12,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
         body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
         .container { background: var(--card-bg); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 800px; position: relative; }
-        
+
         .center-screen { text-align: center; max-width: 500px; margin: 0 auto; }
         .center-screen h1 { margin-bottom: 10px; color: var(--primary); }
         .input-group { margin-bottom: 20px; text-align: left; }
@@ -20,7 +20,14 @@
         .input-group input { width: 100%; padding: 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 16px; }
         button { width: 100%; padding: 14px; background-color: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
         button:hover { background-color: var(--primary-hover); }
+        button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
         .error-msg { color: var(--error); margin-top: 15px; font-size: 14px; display: none; }
+
+        .notice { display: none; padding: 14px; border-radius: 8px; margin-bottom: 22px; font-size: 15px; line-height: 1.5; text-align: center; }
+        .notice.wait { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+        .notice.open { background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; }
+        .notice.closed { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+        .notice .countdown { display: block; font-size: 22px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
 
         #quiz-screen { display: none; }
         .quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -32,7 +39,7 @@
         .options label:hover { border-color: var(--primary); background: #F3F4F6; }
         .options input[type="radio"] { margin-right: 12px; transform: scale(1.2); }
         .options input[type="radio"]:checked + span { font-weight: bold; color: var(--primary); }
-        
+
         #next-btn { background-color: var(--success); margin-top: 20px; }
         #next-btn:hover { background-color: #059669; }
     </style>
@@ -42,7 +49,10 @@
     <div class="container">
         <div id="login-screen" class="center-screen">
             <h1>Translation Competition</h1>
-            <p style="margin-bottom: 30px; color: #6B7280;">Enter your Email and OTP to begin.</p>
+            <p style="margin-bottom: 20px; color: #6B7280;">Enter your Email and OTP to begin.</p>
+
+            <div class="notice" id="quiz-notice"></div>
+
             <div class="input-group">
                 <label>Email Address</label>
                 <input type="email" id="email" placeholder="john@example.com">
@@ -76,8 +86,8 @@
     </div>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbz07esSHvstXPSWV6YZuem1FU2TGceHVpIbpf9yI6KVx1Q99kIL9IIE_TAqGJrpCqlgug/exec"
-        const TIME_PER_QUESTION = 20; 
+        const API_URL = "https://script.google.com/macros/s/AKfycbz07esSHvstXPSWV6YZuem1FU2TGceHVpIbpf9yI6KVx1Q99kIL9IIE_TAqGJrpCqlgug/exec";
+        const TIME_PER_QUESTION = 20;
 
         let currentEmail = "";
         let questions = [];
@@ -86,6 +96,74 @@
         let timerInterval;
         let timeLeft = TIME_PER_QUESTION;
 
+        // ---------- Quiz window notice ----------
+        let windowInfo = null;     // data from server
+        let clockOffset = 0;       // serverMs - browserMs
+        let noticeTimer = null;
+
+        async function loadQuizStatus() {
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: "status" })
+                });
+                const data = await response.json();
+                if (data.status !== "success") return;
+
+                windowInfo = data;
+                clockOffset = data.serverMs - Date.now();
+                updateNotice();
+                noticeTimer = setInterval(updateNotice, 1000);
+            } catch (err) {
+                // If the status call fails, don't block anything; login will still validate on the server
+                console.log("Could not load quiz status", err);
+            }
+        }
+
+        function pad(n) { return String(n).padStart(2, "0"); }
+
+        function formatCountdown(ms) {
+            const total = Math.max(0, Math.floor(ms / 1000));
+            const d = Math.floor(total / 86400);
+            const h = Math.floor((total % 86400) / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            const s = total % 60;
+            return (d > 0 ? d + "d " : "") + pad(h) + "h " + pad(m) + "m " + pad(s) + "s";
+        }
+
+        function updateNotice() {
+            if (!windowInfo) return;
+
+            const box = document.getElementById("quiz-notice");
+            const btn = document.getElementById("login-btn");
+            const now = Date.now() + clockOffset;
+
+            box.style.display = "block";
+
+            if (now < windowInfo.startMs) {
+                box.className = "notice wait";
+                box.innerHTML = "The quiz opens on <b>" + windowInfo.startText + "</b>." +
+                    '<span class="countdown">' + formatCountdown(windowInfo.startMs - now) + "</span>";
+                btn.disabled = true;
+                btn.innerText = "Quiz not started yet";
+            } else if (now > windowInfo.endMs) {
+                box.className = "notice closed";
+                box.innerHTML = "The quiz closed on <b>" + windowInfo.endText + "</b>.";
+                btn.disabled = true;
+                btn.innerText = "Quiz closed";
+                clearInterval(noticeTimer);
+            } else {
+                box.className = "notice open";
+                box.innerHTML = "The quiz is open until <b>" + windowInfo.endText + "</b>.";
+                if (btn.innerText === "Quiz not started yet") {
+                    btn.disabled = false;
+                    btn.innerText = "Start Quiz";
+                }
+            }
+        }
+
+        // ---------- Login ----------
         async function login() {
             const emailInput = document.getElementById('email').value.trim();
             const otpInput = document.getElementById('otp').value.trim();
@@ -107,23 +185,23 @@
 
                 if (data.status === "success") {
 
-    console.log("Questions received from server:", data.questions);
-    console.log("Number of questions:", data.questions?.length);
+                    console.log("Number of questions:", data.questions?.length);
 
-    if (!Array.isArray(data.questions) || data.questions.length !== 30) {
-        showError(
-            "Error: The server returned " +
-            (data.questions?.length || 0) +
-            " questions instead of 30. Please contact the quiz administrator."
-        );
+                    if (!Array.isArray(data.questions) || data.questions.length !== 30) {
+                        showError(
+                            "Error: The server returned " +
+                            (data.questions?.length || 0) +
+                            " questions instead of 30. Please contact the quiz administrator."
+                        );
 
-        btn.disabled = false;
-        btn.innerText = "Start Quiz";
-        return;
-    }
+                        btn.disabled = false;
+                        btn.innerText = "Start Quiz";
+                        return;
+                    }
 
-    currentEmail = emailInput;
-    questions = data.questions;
+                    currentEmail = emailInput;
+                    questions = data.questions;
+                    clearInterval(noticeTimer);
                     document.getElementById('welcome-text').innerText = `Welcome, ${data.participantName}!`;
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('quiz-screen').style.display = 'block';
@@ -133,7 +211,7 @@
                 }
             } catch (err) {
                 console.error(err);
-                showError("Connection failed. Please try again."); 
+                showError("Connection failed. Please try again.");
                 btn.disabled = false; btn.innerText = "Start Quiz";
             }
         }
@@ -181,12 +259,12 @@
         function startTimer() {
             const bar = document.getElementById('timer-bar');
             clearInterval(timerInterval);
-            
+
             bar.style.transition = 'none';
             bar.style.width = '100%';
             bar.style.backgroundColor = 'var(--success)';
-            
-            void bar.offsetWidth; 
+
+            void bar.offsetWidth;
 
             bar.style.transition = `width ${TIME_PER_QUESTION}s linear, background-color 0.5s`;
             bar.style.width = '0%';
@@ -213,9 +291,9 @@
             if (selected) {
                 answers[questions[currentQIndex].id] = selected.value;
             } else {
-                answers[questions[currentQIndex].id] = null; 
+                answers[questions[currentQIndex].id] = null;
             }
-            
+
             document.getElementById('next-btn').disabled = true;
             setTimeout(() => {
                 document.getElementById('next-btn').disabled = false;
@@ -238,6 +316,9 @@
                 console.log("Error submitting to server", err);
             }
         }
+
+        // Load the opening/closing notice as soon as the page opens
+        loadQuizStatus();
     </script>
 </body>
 </html>
