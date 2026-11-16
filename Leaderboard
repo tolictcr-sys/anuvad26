@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Leaderboard</title>
+    <style>
+        :root {
+            --primary: #4F46E5; --bg: #F3F4F6; --card-bg: #FFFFFF; --text: #1F2937;
+            --muted: #6B7280; --gold: #F59E0B; --silver: #9CA3AF; --bronze: #B45309;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; }
+        .wrap { max-width: 900px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 24px; }
+        header h1 { color: var(--primary); font-size: 30px; }
+        header p { color: var(--muted); margin-top: 6px; font-size: 14px; }
+
+        .podium { display: flex; gap: 14px; justify-content: center; align-items: flex-end; margin-bottom: 26px; flex-wrap: wrap; }
+        .pcard { background: var(--card-bg); border-radius: 12px; padding: 18px 14px; width: 220px; text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,0.08); border-top: 6px solid var(--silver); }
+        .pcard.r1 { border-top-color: var(--gold); padding-top: 26px; padding-bottom: 26px; order: 2; }
+        .pcard.r2 { order: 1; }
+        .pcard.r3 { border-top-color: var(--bronze); order: 3; }
+        .medal { font-size: 34px; }
+        .pname { font-weight: 700; margin-top: 6px; font-size: 17px; }
+        .porg { color: var(--muted); font-size: 13px; margin-top: 2px; }
+        .pscore { margin-top: 10px; font-size: 22px; font-weight: 700; color: var(--primary); }
+        .ptime { color: var(--muted); font-size: 13px; }
+
+        .toolbar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+        .toolbar input { flex: 1; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 15px; }
+        .toolbar .status { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+        .table-card { background: var(--card-bg); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 560px; }
+        th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #E5E7EB; }
+        th { background: #EEF2FF; color: var(--primary); font-size: 13px; text-transform: uppercase; letter-spacing: 0.4px; }
+        tr:last-child td { border-bottom: none; }
+        td.rank { font-weight: 700; width: 70px; }
+        td.num { font-variant-numeric: tabular-nums; }
+        tr.top1 td { background: #FFFBEB; }
+        tr.top2 td { background: #F9FAFB; }
+        tr.top3 td { background: #FFF7ED; }
+        .empty { text-align: center; padding: 30px; color: var(--muted); }
+        .err { color: #EF4444; text-align: center; margin: 10px 0; font-size: 14px; display: none; }
+        footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 16px; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <h1>🏆 Quiz Leaderboard</h1>
+        <p>Ranked by highest score. Ties are decided by the shortest time taken.</p>
+    </header>
+
+    <div class="podium" id="podium"></div>
+
+    <div class="toolbar">
+        <input type="text" id="search" placeholder="Search by name or organisation...">
+        <div class="status" id="status">Loading...</div>
+    </div>
+
+    <div class="err" id="err"></div>
+
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Name</th>
+                    <th>Organisation</th>
+                    <th>Score</th>
+                    <th>Time Taken</th>
+                </tr>
+            </thead>
+            <tbody id="rows"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <footer>Updates automatically every 30 seconds.</footer>
+</div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbz07esSHvstXPSWV6YZuem1FU2TGceHVpIbpf9yI6KVx1Q99kIL9IIE_TAqGJrpCqlgug/exec";
+    const REFRESH_SECONDS = 30;
+
+    let allRows = [];
+
+    function esc(s) {
+        return String(s == null ? "" : s)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function fmtDuration(sec) {
+        sec = Number(sec) || 0;
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return m + "m " + String(s).padStart(2, "0") + "s";
+    }
+
+    async function loadLeaderboard() {
+        const status = document.getElementById("status");
+        const err = document.getElementById("err");
+
+        try {
+            const res = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain" },
+                body: JSON.stringify({ action: "leaderboard" })
+            });
+            const data = await res.json();
+
+            if (data.status !== "success") throw new Error(data.message || "Server error");
+
+            // Rank is the position in the already-sorted list from the server
+            allRows = data.leaderboard.map(function (r, i) {
+                return { rank: i + 1, name: r.name, org: r.org, score: r.score, durationSec: r.durationSec };
+            });
+
+            err.style.display = "none";
+            status.textContent = "Updated " + new Date().toLocaleTimeString();
+            render();
+        } catch (e) {
+            console.error(e);
+            err.textContent = "Could not load the leaderboard. Retrying...";
+            err.style.display = "block";
+            status.textContent = "Offline";
+        }
+    }
+
+    function render() {
+        renderPodium();
+        renderTable();
+    }
+
+    function renderPodium() {
+        const medals = ["🥇", "🥈", "🥉"];
+        const top = allRows.slice(0, 3);
+        document.getElementById("podium").innerHTML = top.map(function (r, i) {
+            return '<div class="pcard r' + (i + 1) + '">' +
+                '<div class="medal">' + medals[i] + '</div>' +
+                '<div class="pname">' + esc(r.name) + '</div>' +
+                '<div class="porg">' + esc(r.org) + '</div>' +
+                '<div class="pscore">' + esc(r.score) + ' marks</div>' +
+                '<div class="ptime">⏱ ' + fmtDuration(r.durationSec) + '</div>' +
+                '</div>';
+        }).join("");
+    }
+
+    function renderTable() {
+        const q = document.getElementById("search").value.trim().toLowerCase();
+        const rows = allRows.filter(function (r) {
+            return !q || String(r.name).toLowerCase().indexOf(q) !== -1 ||
+                         String(r.org).toLowerCase().indexOf(q) !== -1;
+        });
+
+        const tbody = document.getElementById("rows");
+
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty">' +
+                (allRows.length === 0 ? "No results yet." : "No matching participants.") + '</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rows.map(function (r) {
+            const cls = r.rank <= 3 ? ' class="top' + r.rank + '"' : "";
+            return '<tr' + cls + '>' +
+                '<td class="rank">' + r.rank + '</td>' +
+                '<td>' + esc(r.name) + '</td>' +
+                '<td>' + esc(r.org) + '</td>' +
+                '<td class="num">' + esc(r.score) + '</td>' +
+                '<td class="num">' + fmtDuration(r.durationSec) + '</td>' +
+                '</tr>';
+        }).join("");
+    }
+
+    document.getElementById("search").addEventListener("input", renderTable);
+
+    loadLeaderboard();
+    setInterval(loadLeaderboard, REFRESH_SECONDS * 1000);
+</script>
+</body>
+</html>
