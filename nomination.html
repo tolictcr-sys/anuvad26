@@ -41,6 +41,10 @@
         #success { display: none; text-align: center; }
         #success h1 { color: var(--success); margin-bottom: 14px; }
         #success p { margin: 10px 0; line-height: 1.5; }
+
+        #closed-view { display: none; text-align: center; }
+        #closed-view h1 { color: var(--error); margin-bottom: 14px; }
+        #closed-view p { margin: 10px 0; line-height: 1.6; }
     </style>
 </head>
 <body>
@@ -126,6 +130,13 @@
         <p>Thank you. Your OTP has been sent to the email ID(s) you entered.</p>
         <p style="color: var(--muted); font-size: 14px;">If you do not see it within a few minutes, please check your Spam folder.</p>
     </div>
+
+    <div id="closed-view">
+        <h1>नामांकन बंद हो चुका है<br> Nominations Closed</h1>
+        <p>नामांकन की अंतिम तिथि 19 नवंबर 2026 को दोपहर 12:00 बजे थी। अब कोई नया नामांकन स्वीकार नहीं किया जाएगा।</p>
+        <p>The nomination portal closed on <strong>19 November 2026 at 12:00 noon IST</strong>.</p>
+        <p style="color: var(--muted); font-size: 14px;">Thank you for your interest.</p>
+    </div>
 </div>
 
 <script>
@@ -138,6 +149,39 @@
     const state = { e1: "empty", e2: "empty" };
     const timers = {};
     const seqs = { e1: 0, e2: 0 };
+
+    // The server is the authority for the closing time.
+    // This also updates pages that were already open when the portal closes.
+    let portalClosed = false;
+    let portalStatusCheckRunning = false;
+
+    function showClosedPortal() {
+        portalClosed = true;
+        $("form-view").style.display = "none";
+        $("success").style.display = "none";
+        $("closed-view").style.display = "block";
+    }
+
+    async function checkPortalStatus() {
+        if (portalClosed || portalStatusCheckRunning) return portalClosed;
+
+        portalStatusCheckRunning = true;
+        try {
+            // An empty email is sufficient: the server checks the cutoff
+            // before attempting email validation.
+            const data = await post({ action: "checkEmail", email: "" });
+            if (data && data.closed) {
+                showClosedPortal();
+                return true;
+            }
+        } catch (err) {
+            // A temporary network error should not falsely close the portal.
+            console.warn("Could not check nomination portal status.", err);
+        } finally {
+            portalStatusCheckRunning = false;
+        }
+        return portalClosed;
+    }
 
     function post(payload) {
         return fetch(API_URL, {
@@ -200,7 +244,14 @@
             const data = await post({ action: "checkEmail", email: value });
             if (seq !== seqs[key]) return;            // a newer check is running
 
-            if (data.status === "success" && data.exists) {
+            if (data.closed) {
+                showClosedPortal();
+                state[key] = "invalid";
+                setMsg(key, "err", data.message || "The nomination portal is closed.");
+            } else if (data.status !== "success") {
+                state[key] = "invalid";
+                setMsg(key, "err", data.message || "Unable to verify email. Please try again.");
+            } else if (data.exists) {
                 state[key] = "dup";
                 setMsg(key, "err", "⚠ This email is already registered. Each email can be nominated only once.");
             } else {
@@ -256,6 +307,10 @@
     async function submitForm() {
         showFormError("");
 
+        // Check the server cutoff before starting submission.
+        if (await checkPortalStatus()) return;
+        if (portalClosed) return;
+
         const payload = {
             action: "nominate",
             org: $("org").value.trim(),
@@ -295,6 +350,11 @@
         try {
             const data = await post(payload);
 
+            if (data.closed) {
+                showClosedPortal();
+                return;
+            }
+
             if (data.status === "success") {
                 $("form-view").style.display = "none";
                 $("success").style.display = "block";
@@ -325,6 +385,10 @@
     watchEmail("e1");
     watchEmail("e2");
     $("submit-btn").addEventListener("click", submitForm);
+
+    // Check immediately when the page opens, then periodically while it remains open.
+    checkPortalStatus();
+    setInterval(checkPortalStatus, 60000);
 </script>
 </body>
 </html>
