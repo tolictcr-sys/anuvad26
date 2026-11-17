@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Nomination</title>
+    <style>
+        :root {
+            --primary: #4F46E5; --primary-hover: #4338CA; --bg: #F3F4F6; --card-bg: #FFFFFF;
+            --text: #1F2937; --error: #EF4444; --success: #10B981; --warning: #F59E0B; --muted: #6B7280;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; }
+        .container { background: var(--card-bg); padding: 36px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 720px; margin: 0 auto; }
+        h1 { color: var(--primary); text-align: center; margin-bottom: 6px; }
+        .sub { text-align: center; color: var(--muted); margin-bottom: 26px; font-size: 14px; }
+
+        fieldset { border: 1px solid #E5E7EB; border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+        legend { padding: 0 8px; font-weight: 700; color: var(--primary); font-size: 15px; }
+        legend small { color: var(--muted); font-weight: 400; }
+
+        .field { margin-bottom: 16px; }
+        .field:last-child { margin-bottom: 0; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+        label .req { color: var(--error); }
+        input { width: 100%; padding: 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 16px; }
+        input:focus { outline: 2px solid #C7D2FE; border-color: var(--primary); }
+        input.bad { border-color: var(--error); background: #FEF2F2; }
+        input.good { border-color: var(--success); }
+
+        .msg { display: none; margin-top: 6px; font-size: 13px; }
+        .msg.err { color: var(--error); font-weight: 600; }
+        .msg.ok { color: #047857; }
+        .msg.info { color: var(--muted); }
+
+        button { width: 100%; padding: 14px; background: var(--primary); color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: var(--primary-hover); }
+        button:disabled { background: #9CA3AF; cursor: not-allowed; }
+
+        .form-error { display: none; background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; padding: 12px; border-radius: 8px; margin-bottom: 14px; font-size: 14px; }
+        #success { display: none; text-align: center; }
+        #success h1 { color: var(--success); margin-bottom: 14px; }
+        #success p { margin: 10px 0; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="form-view">
+        <h1>Quiz Nomination</h1>
+        <p class="sub">Each email ID can be nominated only once. You will receive your OTP by email.</p>
+
+        <div class="form-error" id="form-error"></div>
+
+        <fieldset>
+            <legend>Organisation</legend>
+            <div class="field">
+                <label for="org">Organisation / Office name <span class="req">*</span></label>
+                <input type="text" id="org" placeholder="e.g. SBI Regional Office, Kozhikode">
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Participant 1</legend>
+            <div class="field">
+                <label for="p1Name">प्रतिभागी का नाम / Participant's Name <span class="req">*</span></label>
+                <input type="text" id="p1Name">
+            </div>
+            <div class="field">
+                <label for="p1Desig">पदनाम / Designation <span class="req">*</span></label>
+                <input type="text" id="p1Desig">
+            </div>
+            <div class="field">
+                <label for="p1Mobile">मोबाईल / Mobile <span class="req">*</span></label>
+                <input type="tel" id="p1Mobile" inputmode="numeric" maxlength="15" placeholder="10-digit mobile number">
+            </div>
+            <div class="field">
+                <label for="e1">ईमेल आइडी / Email ID <span class="req">*</span></label>
+                <input type="email" id="e1" placeholder="name@example.com" autocomplete="off">
+                <div class="msg" id="e1-msg"></div>
+            </div>
+            <div class="field">
+                <label for="p1MT">Mother tongue <span class="req">*</span></label>
+                <input type="text" id="p1MT" list="languages" placeholder="Select or type">
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Participant 2 <small>(optional)</small></legend>
+            <div class="field">
+                <label for="p2Name">प्रतिभागी का नाम / Participant's Name</label>
+                <input type="text" id="p2Name">
+            </div>
+            <div class="field">
+                <label for="p2Desig">पदनाम / Designation</label>
+                <input type="text" id="p2Desig">
+            </div>
+            <div class="field">
+                <label for="p2Mobile">मोबाईल / Mobile</label>
+                <input type="tel" id="p2Mobile" inputmode="numeric" maxlength="15" placeholder="10-digit mobile number">
+            </div>
+            <div class="field">
+                <label for="e2">ईमेल आइडी / Email ID</label>
+                <input type="email" id="e2" placeholder="name@example.com" autocomplete="off">
+                <div class="msg" id="e2-msg"></div>
+            </div>
+            <div class="field">
+                <label for="p2MT">Mother tongue</label>
+                <input type="text" id="p2MT" list="languages" placeholder="Select or type">
+            </div>
+        </fieldset>
+
+        <datalist id="languages">
+            <option value="Hindi"><option value="Malayalam"><option value="English">
+            <option value="Tamil"><option value="Telugu"><option value="Kannada">
+            <option value="Marathi"><option value="Gujarati"><option value="Bengali">
+            <option value="Odia"><option value="Punjabi"><option value="Assamese">
+            <option value="Urdu"><option value="Konkani"><option value="Other">
+        </datalist>
+
+        <button id="submit-btn" disabled>Submit Nomination</button>
+    </div>
+
+    <div id="success">
+        <h1>Nomination Received ✓</h1>
+        <p>Thank you. Your OTP has been sent to the email ID(s) you entered.</p>
+        <p style="color: var(--muted); font-size: 14px;">If you do not see it within a few minutes, please check your Spam folder.</p>
+    </div>
+</div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbz07esSHvstXPSWV6YZuem1FU2TGceHVpIbpf9yI6KVx1Q99kIL9IIE_TAqGJrpCqlgug/exec";
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    const $ = function (id) { return document.getElementById(id); };
+
+    // state per email field: empty | pending | checking | ok | dup | invalid
+    const state = { e1: "empty", e2: "empty" };
+    const timers = {};
+    const seqs = { e1: 0, e2: 0 };
+
+    function post(payload) {
+        return fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },   // required for Google Apps Script
+            body: JSON.stringify(payload)
+        }).then(function (r) { return r.json(); });
+    }
+
+    function setMsg(key, type, text) {
+        const el = $(key + "-msg");
+        el.className = "msg " + type;
+        el.textContent = text;
+        el.style.display = text ? "block" : "none";
+
+        const input = $(key);
+        input.classList.remove("bad", "good");
+        if (type === "err") input.classList.add("bad");
+        if (type === "ok") input.classList.add("good");
+    }
+
+    function updateSubmit() {
+        const ok1 = state.e1 === "ok";
+        const ok2 = state.e2 === "empty" || state.e2 === "ok";
+        $("submit-btn").disabled = !(ok1 && ok2);
+    }
+
+    async function runCheck(key) {
+        const other = key === "e1" ? "e2" : "e1";
+        const value = $(key).value.trim().toLowerCase();
+        const otherValue = $(other).value.trim().toLowerCase();
+        const seq = ++seqs[key];
+
+        if (!value) {
+            state[key] = "empty";
+            setMsg(key, "", "");
+            updateSubmit();
+            return;
+        }
+
+        if (!EMAIL_RE.test(value)) {
+            state[key] = "invalid";
+            setMsg(key, "err", "Please enter a valid email address.");
+            updateSubmit();
+            return;
+        }
+
+        if (otherValue && otherValue === value) {
+            state[key] = "dup";
+            setMsg(key, "err", "Both participants cannot use the same email address.");
+            updateSubmit();
+            return;
+        }
+
+        state[key] = "checking";
+        setMsg(key, "info", "Checking...");
+        updateSubmit();
+
+        try {
+            const data = await post({ action: "checkEmail", email: value });
+            if (seq !== seqs[key]) return;            // a newer check is running
+
+            if (data.status === "success" && data.exists) {
+                state[key] = "dup";
+                setMsg(key, "err", "⚠ This email is already registered. Each email can be nominated only once.");
+            } else {
+                state[key] = "ok";
+                setMsg(key, "ok", "✓ Email available");
+            }
+        } catch (err) {
+            if (seq !== seqs[key]) return;
+            // Could not verify now; the server checks again on submit
+            state[key] = "ok";
+            setMsg(key, "info", "Could not verify right now. It will be checked when you submit.");
+        }
+        updateSubmit();
+    }
+
+    function watchEmail(key) {
+        const other = key === "e1" ? "e2" : "e1";
+        const input = $(key);
+
+        input.addEventListener("input", function () {
+            state[key] = input.value.trim() ? "pending" : "empty";
+            setMsg(key, "", "");
+            updateSubmit();
+            clearTimeout(timers[key]);
+            timers[key] = setTimeout(function () {
+                runCheck(key);
+                // if the other field was flagged only because both were the same, re-check it
+                if (state[other] === "dup") runCheck(other);
+            }, 700);
+        });
+
+        input.addEventListener("blur", function () {
+            clearTimeout(timers[key]);
+            if (state[key] === "pending") runCheck(key);
+        });
+    }
+
+    // Keeps the 10-digit number (removes spaces, dashes, +91, leading 0)
+    function cleanMobile(v) {
+        let d = String(v || "").replace(/\D/g, "");
+        if (d.length === 12 && d.indexOf("91") === 0) d = d.slice(2);
+        if (d.length === 11 && d.charAt(0) === "0") d = d.slice(1);
+        return d;
+    }
+
+    function showFormError(text) {
+        const el = $("form-error");
+        el.textContent = text;
+        el.style.display = text ? "block" : "none";
+        if (text) window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function submitForm() {
+        showFormError("");
+
+        const payload = {
+            action: "nominate",
+            org: $("org").value.trim(),
+            p1Name: $("p1Name").value.trim(),
+            p1Desig: $("p1Desig").value.trim(),
+            p1Mobile: $("p1Mobile").value.trim(),
+            p1Email: $("e1").value.trim().toLowerCase(),
+            p1MT: $("p1MT").value.trim(),
+            p2Name: $("p2Name").value.trim(),
+            p2Desig: $("p2Desig").value.trim(),
+            p2Mobile: $("p2Mobile").value.trim(),
+            p2Email: $("e2").value.trim().toLowerCase(),
+            p2MT: $("p2MT").value.trim()
+        };
+
+        if (!payload.org || !payload.p1Name || !payload.p1Desig || !payload.p1Mobile || !payload.p1Email || !payload.p1MT) {
+            return showFormError("Please fill in the organisation and all Participant 1 details.");
+        }
+        if (cleanMobile(payload.p1Mobile).length !== 10) {
+            return showFormError("Participant 1: please enter a valid 10-digit mobile number.");
+        }
+
+        const anyP2 = payload.p2Name || payload.p2Desig || payload.p2Mobile || payload.p2Email || payload.p2MT;
+        if (anyP2) {
+            if (!(payload.p2Name && payload.p2Desig && payload.p2Mobile && payload.p2Email && payload.p2MT)) {
+                return showFormError("For Participant 2, please fill all the details, or leave all of them blank.");
+            }
+            if (cleanMobile(payload.p2Mobile).length !== 10) {
+                return showFormError("Participant 2: please enter a valid 10-digit mobile number.");
+            }
+        }
+
+        const btn = $("submit-btn");
+        btn.disabled = true;
+        btn.textContent = "Submitting...";
+
+        try {
+            const data = await post(payload);
+
+            if (data.status === "success") {
+                $("form-view").style.display = "none";
+                $("success").style.display = "block";
+                return;
+            }
+
+            // Server rejected (e.g. duplicate email)
+            if (Array.isArray(data.duplicates)) {
+                if (data.duplicates.indexOf(payload.p1Email) !== -1) {
+                    state.e1 = "dup";
+                    setMsg("e1", "err", "⚠ This email is already registered. Each email can be nominated only once.");
+                }
+                if (payload.p2Email && data.duplicates.indexOf(payload.p2Email) !== -1) {
+                    state.e2 = "dup";
+                    setMsg("e2", "err", "⚠ This email is already registered. Each email can be nominated only once.");
+                }
+            }
+            showFormError(data.message || "Submission failed. Please try again.");
+        } catch (err) {
+            console.error(err);
+            showFormError("Connection failed. Please check your internet and try again.");
+        }
+
+        btn.textContent = "Submit Nomination";
+        updateSubmit();
+    }
+
+    watchEmail("e1");
+    watchEmail("e2");
+    $("submit-btn").addEventListener("click", submitForm);
+</script>
+</body>
+</html>
